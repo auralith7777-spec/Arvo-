@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Arvo"
+description = "An AI-native accounts receivable workspace for bootstrapped B2B SaaS teams. Track overdue invoices, run a 14-day recovery sequence, and stop follow-ups immediately when Stripe confirms payment."
+version = "1.0.0"
+id = "artifacts/arvo"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21936
+
+[services.development]
+run = "pnpm --filter @workspace/arvo run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/arvo", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/arvo/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21936"
+BASE_PATH = "/"

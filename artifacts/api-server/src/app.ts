@@ -3,6 +3,7 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { stripeWebhookHandler } from "./routes/stripe-webhook";
 
 const app: Express = express();
 
@@ -26,6 +27,14 @@ app.use(
   }),
 );
 app.use(cors());
+
+// Stripe signatures must be checked against the unmodified request bytes.
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  stripeWebhookHandler,
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

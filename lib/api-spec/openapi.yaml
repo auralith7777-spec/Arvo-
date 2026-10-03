@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Arvo accounts receivable recovery API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: invoices
+    description: Tracked overdue invoices
+  - name: dashboard
+    description: Recovery overview and sequence operations
 paths:
   /healthz:
     get:
@@ -24,6 +28,130 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      summary: List tracked invoices
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/InvoiceStatus"
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tracked invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invoice"
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Track an invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceInput"
+      responses:
+        "201":
+          description: Invoice tracked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+  /invoices/{id}/status:
+    patch:
+      operationId: updateInvoiceStatus
+      tags: [invoices]
+      summary: Pause or resume an invoice sequence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceStatusUpdate"
+      responses:
+        "200":
+          description: Updated invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Invoice not found
+  /invoices/{id}/mark-paid:
+    post:
+      operationId: markInvoicePaid
+      tags: [invoices]
+      summary: Mark an invoice paid from the dashboard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paid invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Invoice not found
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get dashboard totals and recent sequence activity
+      responses:
+        "200":
+          description: Dashboard snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [dashboard]
+      summary: Read integration readiness without exposing credentials
+      responses:
+        "200":
+          description: Service readiness
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+  /sequence/run:
+    post:
+      operationId: runSequenceCheck
+      tags: [dashboard]
+      summary: Run the daily invoice sequence check immediately
+      responses:
+        "200":
+          description: Sequence check results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SequenceRun"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +161,200 @@ components:
           type: string
       required:
         - status
+    InvoiceStatus:
+      type: string
+      enum: [active, paused, paid]
+    Invoice:
+      type: object
+      required:
+        - id
+        - customerName
+        - customerEmail
+        - invoiceNumber
+        - stripeInvoiceId
+        - amountCents
+        - currency
+        - dueDate
+        - status
+        - sequenceDay
+        - lastActionTaken
+        - lastActionAt
+        - tone
+        - createdAt
+        - paidAt
+      properties:
+        id:
+          type: integer
+        customerName:
+          type: string
+        customerEmail:
+          type: string
+          format: email
+        invoiceNumber:
+          type: string
+        stripeInvoiceId:
+          type: [string, "null"]
+        amountCents:
+          type: integer
+        currency:
+          type: string
+        dueDate:
+          type: string
+        status:
+          $ref: "#/components/schemas/InvoiceStatus"
+        sequenceDay:
+          type: integer
+          minimum: 0
+          maximum: 14
+        lastActionTaken:
+          type: [string, "null"]
+        lastActionAt:
+          type: [string, "null"]
+        tone:
+          type: string
+          enum: [friendly, direct, warm, formal]
+        createdAt:
+          type: string
+        paidAt:
+          type: [string, "null"]
+    InvoiceInput:
+      type: object
+      required:
+        - customerName
+        - customerEmail
+        - invoiceNumber
+        - amountCents
+        - currency
+        - dueDate
+      properties:
+        customerName:
+          type: string
+          minLength: 1
+        customerEmail:
+          type: string
+          format: email
+        invoiceNumber:
+          type: string
+          minLength: 1
+        stripeInvoiceId:
+          type: [string, "null"]
+        amountCents:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        dueDate:
+          type: string
+        tone:
+          type: string
+          enum: [friendly, direct, warm, formal]
+    InvoiceStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, paused]
+    DashboardActivity:
+      type: object
+      required:
+        - id
+        - invoiceId
+        - invoiceNumber
+        - customerName
+        - actionDay
+        - actionType
+        - result
+        - summary
+        - createdAt
+      properties:
+        id:
+          type: integer
+        invoiceId:
+          type: integer
+        invoiceNumber:
+          type: string
+        customerName:
+          type: string
+        actionDay:
+          type: integer
+        actionType:
+          type: string
+          enum: [email, call]
+        result:
+          type: string
+          enum: [sent, logged, blocked, failed]
+        summary:
+          type: string
+        createdAt:
+          type: string
+    Dashboard:
+      type: object
+      required:
+        - trackedCount
+        - activeCount
+        - pausedCount
+        - paidCount
+        - outstandingByCurrency
+        - recentActivity
+      properties:
+        trackedCount:
+          type: integer
+        activeCount:
+          type: integer
+        pausedCount:
+          type: integer
+        paidCount:
+          type: integer
+        outstandingByCurrency:
+          type: array
+          items:
+            type: object
+            required: [currency, amountCents]
+            properties:
+              currency:
+                type: string
+              amountCents:
+                type: integer
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardActivity"
+    Settings:
+      type: object
+      required:
+        - groqConfigured
+        - stripeWebhookConfigured
+        - resendSenderConfigured
+        - schedulerEnabled
+        - webhookPath
+      properties:
+        groqConfigured:
+          type: boolean
+        stripeWebhookConfigured:
+          type: boolean
+        resendSenderConfigured:
+          type: boolean
+        schedulerEnabled:
+          type: boolean
+        webhookPath:
+          type: string
+    SequenceRun:
+      type: object
+      required:
+        - checked
+        - completed
+        - blocked
+        - message
+      properties:
+        checked:
+          type: integer
+        completed:
+          type: integer
+        blocked:
+          type: integer
+        message:
+          type: string
 
