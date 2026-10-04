@@ -22,3 +22,8 @@ timeoutMs = 20000
 [nix]
 channel = "stable-25_05"
 packages = ["stripe-cli"]
+
+[userenv]
+
+[userenv.shared]
+RESEND_FROM_EMAIL = "onboarding@resend.dev"
