@@ -1,4 +1,3 @@
-import { ReplitConnectors } from "@replit/connectors-sdk";
 import type { Invoice } from "@workspace/api-zod";
 
 type RecoveryEmail = {
@@ -150,11 +149,18 @@ export async function sendRecoveryEmail(
     );
   }
 
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    throw new IntegrationConfigurationError(
+      "Set RESEND_API_KEY (from resend.com/api-keys) to send emails outside Replit.",
+    );
+  }
+
   const draft = await generateRecoveryEmail(invoice, actionDay, daysOverdue);
-  const connectors = new ReplitConnectors();
-  const response = await connectors.proxy("resend", "/emails", {
+  const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
+      Authorization: `Bearer ${resendApiKey}`,
       "Content-Type": "application/json",
       "Idempotency-Key": `arvo-invoice-${invoice.id}-day-${actionDay}`,
     },
