@@ -26,6 +26,8 @@ import type {
   InvoiceInput,
   InvoiceStatusUpdate,
   ListInvoicesParams,
+  NegotiationRequest,
+  NegotiationResult,
   SequenceRun,
   Settings
 } from './api.schemas';
@@ -468,6 +470,95 @@ export const useMarkInvoicePaid = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getMarkInvoicePaidMutationOptions(options));
+    }
+
+export const getNegotiateInvoiceUrl = (id: number,) => {
+
+
+
+
+  return `/api/invoices/${id}/negotiate`
+}
+
+/**
+ * @summary Send a client's message to the AI negotiator and reply with its decision
+ */
+export const negotiateInvoice = async (id: number,
+    negotiationRequest: NegotiationRequest, options?: Parameters<typeof customFetch>[1]): Promise<NegotiationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<NegotiationResult>(getNegotiateInvoiceUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(negotiationRequest)
+  }
+);}
+
+
+
+
+
+export const getNegotiateInvoiceMutationKey = () => ['negotiateInvoice'] as const;
+
+export const getNegotiateInvoiceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof negotiateInvoice>>, TError,NegotiateInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof negotiateInvoice>>, TError,NegotiateInvoiceMutationVariables, TContext> => {
+
+const mutationKey = getNegotiateInvoiceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof negotiateInvoice>>, NegotiateInvoiceMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  negotiateInvoice(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type NegotiateInvoiceMutationResult = NonNullable<Awaited<ReturnType<typeof negotiateInvoice>>>
+    export type NegotiateInvoiceMutationBody = BodyType<NegotiationRequest>
+    export type NegotiateInvoiceMutationError = ErrorType<void>
+    export type NegotiateInvoiceMutationVariables = {id: number;data: BodyType<NegotiationRequest>}
+
+    /**
+ * @summary Send a client's message to the AI negotiator and reply with its decision
+ */
+export const useNegotiateInvoice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof negotiateInvoice>>, TError,NegotiateInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof negotiateInvoice>>,
+        TError,
+        NegotiateInvoiceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getNegotiateInvoiceMutationOptions(options));
     }
 
 export const getGetDashboardUrl = () => {

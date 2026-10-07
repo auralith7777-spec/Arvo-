@@ -7,13 +7,22 @@ import {
   ListInvoicesResponse,
   MarkInvoicePaidParams,
   MarkInvoicePaidResponse,
+  NegotiateInvoiceBody,
+  NegotiateInvoiceParams,
+  NegotiateInvoiceResponse,
   UpdateInvoiceStatusBody,
   UpdateInvoiceStatusParams,
   UpdateInvoiceStatusResponse,
 } from "@workspace/api-zod";
-import { db, arvoInvoicesTable } from "@workspace/db";
+import { db, arvoInvoicesTable, arvoSequenceActionsTable } from "@workspace/db";
 import { markInvoicePaid, toInvoiceDto } from "../lib/invoice-utils";
 import { getSequenceDay, processInvoiceSequence } from "../lib/sequence";
+import {
+  decideNegotiation,
+  sendNegotiationReply,
+} from "../lib/negotiation";
+import { IntegrationConfigurationError } from "../lib/email-recovery";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 const SUPPORTED_CURRENCIES = new Set(["USD", "EUR", "GBP", "CAD", "AUD"]);
@@ -168,6 +177,97 @@ router.post("/invoices/:id/mark-paid", async (req, res): Promise<void> => {
     return;
   }
   res.json(MarkInvoicePaidResponse.parse(toInvoiceDto(paid)));
+});
+
+router.post("/invoices/:id/negotiate", async (req, res): Promise<void> => {
+  const params = NegotiateInvoiceParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const body = NegotiateInvoiceBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(arvoInvoicesTable)
+    .where(eq(arvoInvoicesTable.id, params.data.id))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Invoice not found." });
+    return;
+  }
+  if (existing.status === "paid") {
+    res.status(409).json({ error: "This invoice is already paid." });
+    return;
+  }
+
+  const invoice = toInvoiceDto(existing);
+
+  let decision;
+  try {
+    decision = await decideNegotiation(invoice, body.data.clientMessage);
+  } catch (error) {
+    const status =
+      error instanceof IntegrationConfigurationError ? 503 : 502;
+    const message =
+      error instanceof Error ? error.message : "Negotiation decision failed.";
+    logger.warn({ invoiceId: invoice.id, err: message }, "Negotiation decision failed");
+    res.status(status).json({ error: message });
+    return;
+  }
+
+  let emailSent = false;
+  try {
+    await sendNegotiationReply(invoice, decision);
+    emailSent = true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    logger.warn(
+      { invoiceId: invoice.id, err: message },
+      "Negotiation reply drafted but the email could not be sent",
+    );
+  }
+
+  const summary = `Negotiation ${decision.decision}${
+    decision.terms
+      ? ` (${Object.entries(decision.terms)
+          .filter(([, v]) => v !== undefined && v !== null)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ")})`
+      : ""
+  } — ${decision.reasoning}`.slice(0, 500);
+
+  await db.insert(arvoSequenceActionsTable).values({
+    invoiceId: invoice.id,
+    actionDay: existing.sequenceDay,
+    actionType: "negotiation",
+    result: emailSent ? "sent" : "logged",
+    summary,
+    subject: decision.replySubject,
+  });
+
+  await db
+    .update(arvoInvoicesTable)
+    .set({
+      lastActionTaken: summary,
+      lastActionAt: new Date(),
+    })
+    .where(eq(arvoInvoicesTable.id, invoice.id));
+
+  res.json(
+    NegotiateInvoiceResponse.parse({
+      decision: decision.decision,
+      terms: decision.terms,
+      reasoning: decision.reasoning,
+      replySubject: decision.replySubject,
+      replyBody: decision.replyBody,
+      emailSent,
+    }),
+  );
 });
 
 export default router;

@@ -2,11 +2,11 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetDashboardQueryKey, getListInvoicesQueryKey, useCreateInvoice,
-  useGetDashboard, useListInvoices, useMarkInvoicePaid,
+  useGetDashboard, useListInvoices, useMarkInvoicePaid, useNegotiateInvoice,
   useRunSequenceCheck, useUpdateInvoiceStatus,
 } from '@workspace/api-client-react';
-import type { Invoice, InvoiceInput, InvoiceStatus } from '@workspace/api-client-react';
-import { ArrowDown, ArrowUpRight, Check, ChevronDown, Clock3, FilePlus2, Mail, Pause, Play, RefreshCw, Search, Sparkles, WalletCards, X } from 'lucide-react';
+import type { Invoice, InvoiceInput, InvoiceStatus, NegotiationResult } from '@workspace/api-client-react';
+import { ArrowDown, ArrowUpRight, Check, ChevronDown, Clock3, FilePlus2, Handshake, Mail, Pause, Play, RefreshCw, Search, Sparkles, WalletCards, X } from 'lucide-react';
 
 type StatusFilter = 'all' | InvoiceStatus;
 
@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [negotiatingInvoice, setNegotiatingInvoice] = useState<Invoice | null>(null);
   const [runReport, setRunReport] = useState<{ checked: number; completed: number; blocked: number; message: string } | null>(null);
   const [formError, setFormError] = useState('');
   const queryClient = useQueryClient();
@@ -162,7 +163,7 @@ export default function DashboardPage() {
               <thead><tr className="border-b border-[#eee9e0] text-[10px] font-bold uppercase tracking-[.1em] text-[#899097]">
                 <th className="px-6 py-3.5">Customer</th><th className="px-4 py-3.5">Invoice</th><th className="px-4 py-3.5">Due date</th><th className="px-4 py-3.5">Sequence</th><th className="px-4 py-3.5 text-right">Amount</th><th className="px-6 py-3.5 text-right">Actions</th>
               </tr></thead>
-              <tbody>{invoices.map((invoice) => <InvoiceRow key={invoice.id} invoice={invoice} busy={updateStatus.isPending || markPaid.isPending} onPause={() => updateStatus.mutate({ id: invoice.id, data: { status: invoice.status === 'paused' ? 'active' : 'paused' } }, { onSuccess: refreshWorkspace })} onPaid={() => markPaid.mutate({ id: invoice.id }, { onSuccess: refreshWorkspace })} />)}</tbody>
+              <tbody>{invoices.map((invoice) => <InvoiceRow key={invoice.id} invoice={invoice} busy={updateStatus.isPending || markPaid.isPending} onPause={() => updateStatus.mutate({ id: invoice.id, data: { status: invoice.status === 'paused' ? 'active' : 'paused' } }, { onSuccess: refreshWorkspace })} onPaid={() => markPaid.mutate({ id: invoice.id }, { onSuccess: refreshWorkspace })} onNegotiate={() => setNegotiatingInvoice(invoice)} />)}</tbody>
             </table>
           </div>}
         <div className="flex items-center justify-between border-t border-[#eee9e0] px-6 py-3 text-[11px] text-[#858b90]"><span>Showing {invoices.length} {invoices.length === 1 ? 'invoice' : 'invoices'}</span><span>All amounts in invoice currency</span></div>
@@ -202,10 +203,74 @@ export default function DashboardPage() {
         </form>
       </section>
     </div>}
+
+    {negotiatingInvoice && <NegotiationModal invoice={negotiatingInvoice} onClose={() => setNegotiatingInvoice(null)} onSent={refreshWorkspace} />}
   </div>;
 }
 
-function InvoiceRow({ invoice, busy, onPause, onPaid }: { invoice: Invoice; busy: boolean; onPause: () => void; onPaid: () => void }) {
+function NegotiationModal({ invoice, onClose, onSent }: { invoice: Invoice; onClose: () => void; onSent: () => void }) {
+  const [clientMessage, setClientMessage] = useState('');
+  const [result, setResult] = useState<NegotiationResult | null>(null);
+  const negotiate = useNegotiateInvoice();
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!clientMessage.trim()) return;
+    negotiate.mutate(
+      { id: invoice.id, data: { clientMessage: clientMessage.trim() } },
+      { onSuccess: (data) => { setResult(data); onSent(); } },
+    );
+  };
+
+  const decisionLabel = result?.decision === 'accept' ? 'Accepted' : result?.decision === 'counter' ? 'Countered' : 'Held firm';
+  const decisionTone = result?.decision === 'accept' ? 'bg-[#e4eee5] text-[#3c5f4b]' : result?.decision === 'counter' ? 'bg-[#f5ecd9] text-[#8a6a2c]' : 'bg-[#fbefeb] text-[#8a453b]';
+
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section role="dialog" aria-modal="true" aria-labelledby="negotiate-title" className="modal-card">
+      <div className="mb-5 flex items-start justify-between">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-[.14em] text-[#9b8045]">AI negotiation</span>
+          <h2 id="negotiate-title" className="mb-0 mt-1 font-[Manrope] text-[21px] font-bold tracking-[-.04em]">{invoice.customerName} — {invoice.invoiceNumber}</h2>
+          <p className="mb-0 mt-1 text-sm text-[#7b8288]">Paste what the client said in reply. Arvo will decide within policy and send the response.</p>
+        </div>
+        <button className="icon-button" type="button" onClick={onClose} aria-label="Close"><X size={18} /></button>
+      </div>
+
+      {!result ? <form onSubmit={submit} className="space-y-3">
+        <label className="field-label">Client's message
+          <textarea
+            value={clientMessage}
+            onChange={(event) => setClientMessage(event.target.value)}
+            required
+            rows={5}
+            placeholder="e.g. 'We can pay but need to split this into a few payments over the next couple months.'"
+            data-testid="input-negotiation-message"
+            className="w-full rounded-lg border border-[#e4dfd5] bg-white px-3 py-2 text-sm text-[#384452]"
+          />
+        </label>
+        {negotiate.isError && <p className="m-0 rounded-lg bg-[#fbefeb] px-3 py-2 text-xs text-[#8a453b]" role="alert">Arvo could not reach the negotiation engine. Try again.</p>}
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" className="button-secondary" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={negotiate.isPending} className="button-primary">{negotiate.isPending ? 'Deciding…' : 'Send to Arvo'}</button>
+        </div>
+      </form> : <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.08em] ${decisionTone}`}>{decisionLabel}</span>
+          {!result.emailSent && <span className="text-[11px] text-[#8a453b]">Reply drafted but not sent — email delivery failed.</span>}
+        </div>
+        {result.terms && <p className="m-0 text-xs text-[#6c7378]">Terms: {Object.entries(result.terms).filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => `${k}: ${v}`).join(' · ')}</p>}
+        <p className="m-0 text-xs italic text-[#8c9295]">{result.reasoning}</p>
+        <div className="rounded-lg border border-[#e4dfd5] bg-[#fbfaf6] p-4">
+          <p className="m-0 text-[11px] font-semibold uppercase tracking-[.08em] text-[#9b8045]">{result.replySubject}</p>
+          <p className="mb-0 mt-2 whitespace-pre-wrap text-[12px] leading-relaxed text-[#4e5964]">{result.replyBody}</p>
+        </div>
+        <div className="flex justify-end pt-2"><button type="button" className="button-primary" onClick={onClose}>Done</button></div>
+      </div>}
+    </section>
+  </div>;
+}
+
+function InvoiceRow({ invoice, busy, onPause, onPaid, onNegotiate }: { invoice: Invoice; busy: boolean; onPause: () => void; onPaid: () => void; onNegotiate: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const overdue = Math.max(0, Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / 86_400_000));
   return <tr className="invoice-row" data-testid={`row-invoice-${invoice.id}`}>
@@ -217,6 +282,7 @@ function InvoiceRow({ invoice, busy, onPause, onPaid }: { invoice: Invoice; busy
     <td className="relative px-6 py-4 text-right"><div className="flex justify-end gap-1.5">
       {invoice.status !== 'paid' && <button type="button" disabled={busy} className="row-action" onClick={onPause} title={invoice.status === 'paused' ? 'Resume sequence' : 'Pause sequence'} data-testid={`${invoice.status === 'paused' ? 'button-resume' : 'button-pause'}-${invoice.id}`}>{invoice.status === 'paused' ? <Play size={14} /> : <Pause size={14} />}</button>}
        {invoice.status !== 'paid' && <button type="button" disabled={busy} className="row-action row-action-paid" onClick={onPaid} title="Mark invoice paid" data-testid={`button-mark-paid-${invoice.id}`}><Check size={14} /></button>}
+      {invoice.status !== 'paid' && <button type="button" className="row-action" onClick={onNegotiate} title="Negotiate payment terms" data-testid={`button-negotiate-${invoice.id}`}><Handshake size={14} /></button>}
       <button type="button" className="row-action" onClick={() => setMenuOpen(!menuOpen)} aria-label="More invoice details" aria-expanded={menuOpen} data-testid={`button-invoice-menu-${invoice.id}`}><ChevronDown size={14} /></button>
     </div>{menuOpen && <div className="row-menu"><p className="mono mb-2 text-[9px] uppercase tracking-[.12em] text-[#969b9f]">Latest touch</p><p className="m-0 text-[11px] font-medium text-[#4e5964]">{invoice.lastActionTaken || 'No action recorded'}</p><p className="mb-0 mt-1 text-[10px] text-[#858b90]">{invoice.lastActionAt ? dateShort(invoice.lastActionAt) : `Tone: ${invoice.tone}`}</p><button className="mt-3 w-full border-t border-[#eee9e0] pt-2 text-left text-[10px] font-semibold text-[#536a7e]" onClick={() => setMenuOpen(false)}>Close details</button></div>}</td>
   </tr>;

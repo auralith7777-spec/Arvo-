@@ -137,11 +137,18 @@ async function generateRecoveryEmail(
   };
 }
 
-export async function sendRecoveryEmail(
-  invoice: Invoice,
-  actionDay: number,
-  daysOverdue: number,
-): Promise<string> {
+/**
+ * Low-level Resend call shared by the recovery sequence and the
+ * negotiation flow. Throws IntegrationConfigurationError if the
+ * required env vars are missing, otherwise throws a plain Error on
+ * a non-2xx Resend response.
+ */
+export async function sendEmail(
+  invoice: Pick<Invoice, "customerEmail">,
+  subject: string,
+  body: string,
+  idempotencyKey: string,
+): Promise<void> {
   const fromEmail = process.env.RESEND_FROM_EMAIL;
   if (!fromEmail) {
     throw new IntegrationConfigurationError(
@@ -156,20 +163,19 @@ export async function sendRecoveryEmail(
     );
   }
 
-  const draft = await generateRecoveryEmail(invoice, actionDay, daysOverdue);
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${resendApiKey}`,
       "Content-Type": "application/json",
-      "Idempotency-Key": `arvo-invoice-${invoice.id}-day-${actionDay}`,
+      "Idempotency-Key": idempotencyKey,
     },
     body: JSON.stringify({
       from: fromEmail,
       to: [invoice.customerEmail],
-      subject: draft.subject,
-      text: draft.body,
-      html: emailHtml(draft.body),
+      subject,
+      text: body,
+      html: emailHtml(body),
     }),
   });
 
@@ -177,6 +183,19 @@ export async function sendRecoveryEmail(
     const detail = (await response.text()).slice(0, 240);
     throw new Error(`Resend returned ${response.status}: ${detail}`);
   }
+}
 
+export async function sendRecoveryEmail(
+  invoice: Invoice,
+  actionDay: number,
+  daysOverdue: number,
+): Promise<string> {
+  const draft = await generateRecoveryEmail(invoice, actionDay, daysOverdue);
+  await sendEmail(
+    invoice,
+    draft.subject,
+    draft.body,
+    `arvo-invoice-${invoice.id}-day-${actionDay}`,
+  );
   return draft.subject;
 }

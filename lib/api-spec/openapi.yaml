@@ -116,6 +116,34 @@ paths:
                 $ref: "#/components/schemas/Invoice"
         "404":
           description: Invoice not found
+  /invoices/{id}/negotiate:
+    post:
+      operationId: negotiateInvoice
+      tags: [invoices]
+      summary: Send a client's message to the AI negotiator and reply with its decision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NegotiationRequest"
+      responses:
+        "200":
+          description: Negotiation decision and sent reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NegotiationResult"
+        "404":
+          description: Invoice not found
+        "409":
+          description: Invoice is already paid
   /dashboard:
     get:
       operationId: getDashboard
@@ -257,6 +285,50 @@ components:
         status:
           type: string
           enum: [active, paused]
+    NegotiationRequest:
+      type: object
+      required: [clientMessage]
+      properties:
+        clientMessage:
+          type: string
+          minLength: 1
+          maxLength: 4000
+    NegotiationDecision:
+      type: string
+      enum: [accept, counter, reject]
+    NegotiationTerms:
+      type: object
+      properties:
+        installments:
+          type: [integer, "null"]
+        extensionDays:
+          type: [integer, "null"]
+        settlementPercent:
+          type: [number, "null"]
+    NegotiationResult:
+      type: object
+      required:
+        - decision
+        - terms
+        - reasoning
+        - replySubject
+        - replyBody
+        - emailSent
+      properties:
+        decision:
+          $ref: "#/components/schemas/NegotiationDecision"
+        terms:
+          oneOf:
+            - $ref: "#/components/schemas/NegotiationTerms"
+            - type: "null"
+        reasoning:
+          type: string
+        replySubject:
+          type: string
+        replyBody:
+          type: string
+        emailSent:
+          type: boolean
     DashboardActivity:
       type: object
       required:

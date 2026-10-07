@@ -163,6 +163,35 @@ export const MarkInvoicePaidResponse = zod.object({
 
 
 /**
+ * @summary Send a client's message to the AI negotiator and reply with its decision
+ */
+export const NegotiateInvoiceParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const negotiateInvoiceBodyClientMessageMax = 4000;
+
+
+
+export const NegotiateInvoiceBody = zod.object({
+  "clientMessage": zod.string().min(1).max(negotiateInvoiceBodyClientMessageMax)
+})
+
+export const NegotiateInvoiceResponse = zod.object({
+  "decision": zod.enum(['accept', 'counter', 'reject']),
+  "terms": zod.union([zod.object({
+  "installments": zod.number().int().nullish(),
+  "extensionDays": zod.number().int().nullish(),
+  "settlementPercent": zod.number().nullish()
+}),zod.null()]),
+  "reasoning": zod.string(),
+  "replySubject": zod.string(),
+  "replyBody": zod.string(),
+  "emailSent": zod.boolean()
+})
+
+
+/**
  * @summary Get dashboard totals and recent sequence activity
  */
 export const GetDashboardResponse = zod.object({

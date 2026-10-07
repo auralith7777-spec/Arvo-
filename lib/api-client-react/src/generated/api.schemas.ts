@@ -95,6 +95,41 @@ export interface InvoiceStatusUpdate {
   status: InvoiceStatusUpdateStatus;
 }
 
+export interface NegotiationRequest {
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  clientMessage: string;
+}
+
+export type NegotiationDecision = typeof NegotiationDecision[keyof typeof NegotiationDecision];
+
+
+export const NegotiationDecision = {
+  accept: 'accept',
+  counter: 'counter',
+  reject: 'reject',
+} as const;
+
+export interface NegotiationTerms {
+  /** @nullable */
+  installments?: number | null;
+  /** @nullable */
+  extensionDays?: number | null;
+  /** @nullable */
+  settlementPercent?: number | null;
+}
+
+export interface NegotiationResult {
+  decision: NegotiationDecision;
+  terms: NegotiationTerms | null;
+  reasoning: string;
+  replySubject: string;
+  replyBody: string;
+  emailSent: boolean;
+}
+
 export type DashboardActivityActionType = typeof DashboardActivityActionType[keyof typeof DashboardActivityActionType];
 
 
