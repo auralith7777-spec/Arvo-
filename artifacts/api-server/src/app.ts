@@ -2,10 +2,16 @@ import path from "path";
 import fs from "fs";
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { stripeWebhookHandler } from "./routes/stripe-webhook";
+
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  throw new Error("SESSION_SECRET environment variable is required.");
+}
 
 const app: Express = express();
 
@@ -39,6 +45,7 @@ app.post(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser(sessionSecret));
 
 app.use("/api", router);
 

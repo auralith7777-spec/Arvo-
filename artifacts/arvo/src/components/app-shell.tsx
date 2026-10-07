@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Activity, ArrowUpRight, CircleHelp, Command, Settings2 } from 'lucide-react';
+import { Activity, ArrowUpRight, CircleHelp, Command, LogOut, Settings2 } from 'lucide-react';
 import { useHealthCheck } from '@workspace/api-client-react';
+
+async function handleLogout() {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  window.location.reload();
+}
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
@@ -38,6 +43,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
           <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] text-[#aeb8c2] hover:bg-[#2a3949]" onClick={() => health.refetch()} data-testid="button-health-refresh">
             <CircleHelp size={15} /> Help & system status <ArrowUpRight size={13} className="ml-auto" />
+          </button>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] text-[#aeb8c2] hover:bg-[#2a3949]" onClick={handleLogout} data-testid="button-logout">
+            <LogOut size={15} /> Sign out
           </button>
           <div className="mt-4 border-t border-[#394757] px-2 pt-4 text-[10px] text-[#778594]">ARVO RECOVERY WORKSPACE <span className="float-right mono">v0.1</span></div>
         </div>
