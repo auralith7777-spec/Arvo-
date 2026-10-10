@@ -1,5 +1,6 @@
 import type { Invoice } from "@workspace/api-zod";
 import { IntegrationConfigurationError } from "./email-recovery";
+import { signScript } from "../routes/voice";
 
 /**
  * Voice calls are placed through Twilio's REST API. Invoices don't carry
@@ -24,15 +25,6 @@ function money(amountCents: number, currency: string): string {
   } catch {
     return `${(amountCents / 100).toFixed(2)} ${currency.toUpperCase()}`;
   }
-}
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }
 
 export async function generateCallScript(
@@ -120,7 +112,13 @@ export async function placeCall(script: string): Promise<string> {
     );
   }
 
-  const twiml = `<Response><Pause length="1"/><Say voice="Polly.Joanna" language="en-US">${escapeXml(script)}</Say></Response>`;
+  const baseUrl = process.env.PUBLIC_BASE_URL ?? process.env.RENDER_EXTERNAL_URL;
+  if (!baseUrl) {
+    throw new IntegrationConfigurationError(
+      "Set PUBLIC_BASE_URL so Twilio can fetch the call script.",
+    );
+  }
+  const twimlUrl = `${baseUrl.replace(/\/$/, "")}/api/voice/twiml?${new URLSearchParams({ script, sig: signScript(script) }).toString()}`;
 
   const response = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`,
@@ -130,7 +128,7 @@ export async function placeCall(script: string): Promise<string> {
         Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({ To: to, From: from, Twiml: twiml }).toString(),
+      body: new URLSearchParams({ To: to, From: from, Url: twimlUrl }).toString(),
     },
   );
 
