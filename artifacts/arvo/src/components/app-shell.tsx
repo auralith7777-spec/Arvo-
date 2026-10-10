@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Activity, ArrowUpRight, CircleHelp, Command, LogOut, Settings2 } from 'lucide-react';
+import { Activity, ArrowUpRight, CircleHelp, Command, Inbox, LogOut, Settings2 } from 'lucide-react';
 import { useHealthCheck } from '@workspace/api-client-react';
 
 async function handleLogout() {
@@ -27,6 +27,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <nav className="space-y-1">
             <Link href="/" className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold no-underline transition-colors ${location === '/' ? 'bg-[#344354] text-[#fffaf0]' : 'text-[#b5bec7] hover:bg-[#2a3949] hover:text-white'}`} data-testid="link-dashboard">
               <Activity size={17} /> Recovery desk
+            </Link>
+            <Link href="/inbox" className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold no-underline transition-colors ${location === '/inbox' ? 'bg-[#344354] text-[#fffaf0]' : 'text-[#b5bec7] hover:bg-[#2a3949] hover:text-white'}`} data-testid="link-inbox">
+              <Inbox size={17} /> Inbox
             </Link>
             <Link href="/settings" className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold no-underline transition-colors ${location === '/settings' ? 'bg-[#344354] text-[#fffaf0]' : 'text-[#b5bec7] hover:bg-[#2a3949] hover:text-white'}`} data-testid="link-settings">
               <Settings2 size={17} /> Settings
@@ -55,6 +58,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <Link href="/" className="font-[Manrope] text-xl font-extrabold tracking-[-.06em] text-[#283342] no-underline">arvo<span className="text-[#c99c31]">.</span></Link>
           <nav className="flex gap-4 text-xs font-semibold">
             <Link href="/" className="text-[#344e68] no-underline">Recovery</Link>
+            <Link href="/inbox" className="text-[#687584] no-underline">Inbox</Link>
             <Link href="/settings" className="text-[#687584] no-underline">Settings</Link>
           </nav>
         </header>

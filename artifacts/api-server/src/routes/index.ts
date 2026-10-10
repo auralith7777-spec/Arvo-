@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import authRouter from "./auth";
 import dashboardRouter from "./dashboard";
 import healthRouter from "./health";
+import inboxRouter from "./inbox";
 import invoicesRouter from "./invoices";
 import voiceRouter from "./voice";
 import { requireAuth } from "../lib/auth";
@@ -17,5 +18,6 @@ router.use(voiceRouter); // Twilio fetches this mid-call, so it can't require a 
 router.use(requireAuth);
 router.use(dashboardRouter);
 router.use(invoicesRouter);
+router.use(inboxRouter);
 
 export default router;
