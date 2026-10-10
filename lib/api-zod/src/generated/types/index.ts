@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './callResult';
 export * from './dashboard';
 export * from './dashboardActivity';
 export * from './dashboardActivityActionType';

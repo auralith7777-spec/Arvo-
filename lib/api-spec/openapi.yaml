@@ -144,6 +144,30 @@ paths:
           description: Invoice not found
         "409":
           description: Invoice is already paid
+  /invoices/{id}/call:
+    post:
+      operationId: callInvoice
+      tags: [invoices]
+      summary: Place an AI voice reminder call for this invoice right now
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Call placed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallResult"
+        "404":
+          description: Invoice not found
+        "409":
+          description: Invoice is already paid
+        "503":
+          description: Voice calling is not configured
   /dashboard:
     get:
       operationId: getDashboard
@@ -285,6 +309,14 @@ components:
         status:
           type: string
           enum: [active, paused]
+    CallResult:
+      type: object
+      required: [placed, script]
+      properties:
+        placed:
+          type: boolean
+        script:
+          type: string
     NegotiationRequest:
       type: object
       required: [clientMessage]

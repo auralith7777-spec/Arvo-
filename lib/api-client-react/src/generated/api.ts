@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CallResult,
   Dashboard,
   HealthStatus,
   Invoice,
@@ -559,6 +560,80 @@ export const useNegotiateInvoice = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getNegotiateInvoiceMutationOptions(options));
+    }
+
+export const getCallInvoiceUrl = (id: number,) => {
+
+
+
+
+  return `/api/invoices/${id}/call`
+}
+
+/**
+ * @summary Place an AI voice reminder call for this invoice right now
+ */
+export const callInvoice = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<CallResult> => {
+
+  return customFetch<CallResult>(getCallInvoiceUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCallInvoiceMutationKey = () => ['callInvoice'] as const;
+
+export const getCallInvoiceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof callInvoice>>, TError,CallInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof callInvoice>>, TError,CallInvoiceMutationVariables, TContext> => {
+
+const mutationKey = getCallInvoiceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof callInvoice>>, CallInvoiceMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  callInvoice(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CallInvoiceMutationResult = NonNullable<Awaited<ReturnType<typeof callInvoice>>>
+
+    export type CallInvoiceMutationError = ErrorType<void>
+    export type CallInvoiceMutationVariables = {id: number}
+
+    /**
+ * @summary Place an AI voice reminder call for this invoice right now
+ */
+export const useCallInvoice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof callInvoice>>, TError,CallInvoiceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof callInvoice>>,
+        TError,
+        CallInvoiceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCallInvoiceMutationOptions(options));
     }
 
 export const getGetDashboardUrl = () => {

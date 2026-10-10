@@ -7,6 +7,7 @@ import {
   IntegrationConfigurationError,
   sendRecoveryEmail,
 } from "./email-recovery";
+import { isVoiceConfigured, placeRecoveryCall } from "./voice-call";
 
 const ACTION_DAYS = [1, 4, 7, 10, 14] as const;
 const EMAIL_DAYS = new Set([1, 4, 10]);
@@ -77,6 +78,10 @@ export async function processInvoiceSequence(
         subject = await sendRecoveryEmail(invoice, actionDay, sequenceDay);
         summary = `Day ${actionDay} AI follow-up sent`;
         result = "sent";
+      } else if (isVoiceConfigured()) {
+        await placeRecoveryCall(invoice, actionDay);
+        summary = `Day ${actionDay} AI voice call placed`;
+        result = "sent";
       } else {
         summary = `Day ${actionDay} voice call trigger logged (calling not connected)`;
         result = "logged";
@@ -106,12 +111,12 @@ export async function processInvoiceSequence(
         error instanceof IntegrationConfigurationError ? "blocked" : "failed";
       const detail =
         error instanceof Error ? error.message.slice(0, 240) : "Unknown error";
-      const summary = `Day ${actionDay} email ${result}: ${detail}`;
+      const summary = `Day ${actionDay} ${actionType} ${result}: ${detail}`;
 
       await tx.insert(arvoSequenceActionsTable).values({
         invoiceId: row.id,
         actionDay,
-        actionType: "email",
+        actionType,
         result,
         summary,
       });

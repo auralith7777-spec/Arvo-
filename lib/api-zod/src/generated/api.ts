@@ -192,6 +192,19 @@ export const NegotiateInvoiceResponse = zod.object({
 
 
 /**
+ * @summary Place an AI voice reminder call for this invoice right now
+ */
+export const CallInvoiceParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const CallInvoiceResponse = zod.object({
+  "placed": zod.boolean(),
+  "script": zod.string()
+})
+
+
+/**
  * @summary Get dashboard totals and recent sequence activity
  */
 export const GetDashboardResponse = zod.object({

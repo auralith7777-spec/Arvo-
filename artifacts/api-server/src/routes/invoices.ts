@@ -1,6 +1,8 @@
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
+  CallInvoiceParams,
+  CallInvoiceResponse,
   CreateInvoiceBody,
   CreateInvoiceResponse,
   ListInvoicesQueryParams,
@@ -22,6 +24,7 @@ import {
   sendNegotiationReply,
 } from "../lib/negotiation";
 import { IntegrationConfigurationError } from "../lib/email-recovery";
+import { isVoiceConfigured, placeRecoveryCall } from "../lib/voice-call";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -268,6 +271,60 @@ router.post("/invoices/:id/negotiate", async (req, res): Promise<void> => {
       emailSent,
     }),
   );
+});
+
+router.post("/invoices/:id/call", async (req, res): Promise<void> => {
+  const params = CallInvoiceParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(arvoInvoicesTable)
+    .where(eq(arvoInvoicesTable.id, params.data.id))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Invoice not found." });
+    return;
+  }
+  if (existing.status === "paid") {
+    res.status(409).json({ error: "This invoice is already paid." });
+    return;
+  }
+  if (!isVoiceConfigured()) {
+    res.status(503).json({ error: "Voice calling is not configured yet." });
+    return;
+  }
+
+  const invoice = toInvoiceDto(existing);
+  const actionDay = existing.sequenceDay >= 14 ? 14 : 7;
+
+  let script: string;
+  try {
+    script = await placeRecoveryCall(invoice, actionDay);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Call failed.";
+    logger.warn({ invoiceId: invoice.id, err: message }, "Manual voice call failed");
+    res.status(502).json({ error: message });
+    return;
+  }
+
+  const summary = "AI voice call placed (manual)";
+  await db.insert(arvoSequenceActionsTable).values({
+    invoiceId: invoice.id,
+    actionDay: existing.sequenceDay,
+    actionType: "call",
+    result: "sent",
+    summary,
+  });
+  await db
+    .update(arvoInvoicesTable)
+    .set({ lastActionTaken: summary, lastActionAt: new Date() })
+    .where(eq(arvoInvoicesTable.id, invoice.id));
+
+  res.json(CallInvoiceResponse.parse({ placed: true, script }));
 });
 
 export default router;

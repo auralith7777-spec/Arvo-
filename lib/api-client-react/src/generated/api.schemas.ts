@@ -95,6 +95,11 @@ export interface InvoiceStatusUpdate {
   status: InvoiceStatusUpdateStatus;
 }
 
+export interface CallResult {
+  placed: boolean;
+  script: string;
+}
+
 export interface NegotiationRequest {
   /**
      * @minLength 1
