@@ -12,4 +12,5 @@ export type DashboardActivityActionType = typeof DashboardActivityActionType[key
 export const DashboardActivityActionType = {
   email: 'email',
   call: 'call',
+  negotiation: 'negotiation',
 } as const;

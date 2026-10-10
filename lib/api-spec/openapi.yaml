@@ -386,7 +386,7 @@ components:
           type: integer
         actionType:
           type: string
-          enum: [email, call]
+          enum: [email, call, negotiation]
         result:
           type: string
           enum: [sent, logged, blocked, failed]

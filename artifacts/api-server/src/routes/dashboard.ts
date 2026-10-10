@@ -65,7 +65,7 @@ router.get("/dashboard", async (_req, res): Promise<void> => {
       })),
       recentActivity: recentRows.map((activity) => ({
         ...activity,
-        actionType: activity.actionType as "email" | "call",
+        actionType: activity.actionType as "email" | "call" | "negotiation",
         result: activity.result as "sent" | "logged" | "blocked" | "failed",
         createdAt: activity.createdAt.toISOString(),
       })),

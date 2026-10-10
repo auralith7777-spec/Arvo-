@@ -222,7 +222,7 @@ export const GetDashboardResponse = zod.object({
   "invoiceNumber": zod.string(),
   "customerName": zod.string(),
   "actionDay": zod.number().int(),
-  "actionType": zod.enum(['email', 'call']),
+  "actionType": zod.enum(['email', 'call', 'negotiation']),
   "result": zod.enum(['sent', 'logged', 'blocked', 'failed']),
   "summary": zod.string(),
   "createdAt": zod.string()
