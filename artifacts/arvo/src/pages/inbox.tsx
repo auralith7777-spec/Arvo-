@@ -40,7 +40,7 @@ export default function InboxPage() {
   const [vips, setVips] = useState<string[]>([]);
   const [vipInput, setVipInput] = useState('');
   const [brief, setBrief] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'sync' | 'brief' | null>(null);
+  const [busy, setBusy] = useState<'sync' | 'brief' | 'email' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +81,13 @@ export default function InboxPage() {
     finally { setBusy(null); }
   };
 
+  const emailBrief = async () => {
+    setBusy('email'); setError(null); setNotice(null);
+    try { const r = await api<{ sentTo: string }>('/brief/send', { method: 'POST' }); setNotice(`Brief emailed to ${r.sentTo}. Check your inbox.`); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not email the brief.'); }
+    finally { setBusy(null); }
+  };
+
   const addVip = async (event: FormEvent) => {
     event.preventDefault();
     try { await api('/vips', { method: 'POST', body: JSON.stringify({ email: vipInput }) }); setVipInput(''); await load(); }
@@ -95,9 +102,11 @@ export default function InboxPage() {
         <span className="text-[10px] font-bold uppercase tracking-[.14em] text-[#9b8045]">Chief of Staff</span>
         <h1 className="mb-0 mt-1 font-[Manrope] text-[28px] font-bold tracking-[-.04em] text-[#283342]">Inbox</h1>
         <p className="mb-0 mt-1 text-sm text-[#7b8288]">Arvo reads your recent email, sorts it by urgency, and saves reply drafts in Gmail. Nothing is ever sent for you.</p>
+        {status?.connected && <p className="mb-0 mt-1 text-xs text-[#9b8045]">Auto-sync every 30 minutes · morning brief emailed daily at 7:00 AM IST.</p>}
       </div>
       {status?.connected && <div className="flex flex-wrap items-center gap-2">
         <button type="button" className="button-secondary" onClick={loadBrief} disabled={busy !== null}><Sparkles size={14} /> {busy === 'brief' ? 'Writing…' : 'Morning brief'}</button>
+        <button type="button" className="button-secondary" onClick={emailBrief} disabled={busy !== null}><Mail size={14} /> {busy === 'email' ? 'Sending…' : 'Email me the brief'}</button>
         <button type="button" className="button-primary" onClick={sync} disabled={busy !== null} data-testid="button-inbox-sync"><RefreshCw size={14} /> {busy === 'sync' ? 'Triaging…' : 'Sync inbox'}</button>
       </div>}
     </header>

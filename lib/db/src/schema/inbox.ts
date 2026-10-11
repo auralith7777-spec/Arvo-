@@ -12,6 +12,7 @@ export const inboxAccountTable = pgTable("inbox_account", {
   id: serial("id").primaryKey(),
   email: text("email").notNull(),
   refreshToken: text("refresh_token").notNull(),
+  lastBriefDate: text("last_brief_date"),
   connectedAt: timestamp("connected_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

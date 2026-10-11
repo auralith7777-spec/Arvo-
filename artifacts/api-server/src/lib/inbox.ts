@@ -104,7 +104,7 @@ export type SyncResult = { fetched: number; processed: number; drafts: number; f
 
 const BATCH_SIZE = 6;
 
-export async function syncInbox(): Promise<SyncResult> {
+async function runSync(): Promise<SyncResult> {
   const [account] = await db.select().from(inboxAccountTable).limit(1);
   if (!account) throw new IntegrationConfigurationError("Connect Gmail first.");
 
@@ -169,6 +169,18 @@ export async function syncInbox(): Promise<SyncResult> {
     }
   }
   return { fetched: recent.length, processed, drafts, failed, remaining };
+}
+
+let syncRunning = false;
+
+export async function syncInbox(): Promise<SyncResult> {
+  if (syncRunning) throw new Error("A sync is already running. Try again in a minute.");
+  syncRunning = true;
+  try {
+    return await runSync();
+  } finally {
+    syncRunning = false;
+  }
 }
 
 export async function generateBrief(): Promise<string> {

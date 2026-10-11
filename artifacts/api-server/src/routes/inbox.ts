@@ -15,6 +15,7 @@ import {
   isGmailConfigured,
 } from "../lib/gmail";
 import { generateBrief, removeAccount, syncInbox } from "../lib/inbox";
+import { sendBriefEmail } from "../lib/inbox-scheduler";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -107,6 +108,15 @@ router.get("/inbox/brief", async (_req, res): Promise<void> => {
   try {
     res.json({ brief: await generateBrief() });
   } catch (error) {
+    res.status(502).json({ error: errorMessage(error) });
+  }
+});
+
+router.post("/inbox/brief/send", async (_req, res): Promise<void> => {
+  try {
+    res.json({ sentTo: await sendBriefEmail({ force: true }) });
+  } catch (error) {
+    logger.warn({ err: errorMessage(error) }, "Manual brief email failed");
     res.status(502).json({ error: errorMessage(error) });
   }
 });
