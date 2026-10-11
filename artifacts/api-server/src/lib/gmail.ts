@@ -153,6 +153,17 @@ function findPlainText(part: Part | undefined): string {
   return "";
 }
 
+/** Gmail returns snippets HTML-escaped (e.g. &#39;), so decode them for display. */
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
 function parseFrom(value: string): { name: string; address: string } {
   const match = value.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
   if (match) return { name: match[1].trim(), address: match[2].trim().toLowerCase() };
@@ -179,8 +190,8 @@ function toMessage(raw: RawMessage): GmailMessage {
     fromAddress: from.address,
     fromName: from.name,
     subject: header("subject"),
-    snippet: raw.snippet ?? "",
-    body: (findPlainText(raw.payload) || raw.snippet || "").slice(0, 3000),
+    snippet: decodeEntities(raw.snippet ?? ""),
+    body: (findPlainText(raw.payload) || decodeEntities(raw.snippet ?? "")).slice(0, 3000),
     receivedAt: new Date(Number(raw.internalDate ?? Date.now())),
   };
 }
