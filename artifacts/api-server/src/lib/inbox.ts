@@ -30,22 +30,32 @@ async function groqJson(system: string, user: string, maxTokens: number) {
   if (!apiKey) {
     throw new IntegrationConfigurationError("Add GROQ_API_KEY to enable inbox triage.");
   }
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: MODEL,
-      temperature: 0.3,
-      max_tokens: maxTokens,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
+  const payload = JSON.stringify({
+    model: MODEL,
+    temperature: 0.3,
+    max_tokens: maxTokens,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
   });
-  if (!response.ok) {
-    throw new Error(`Groq returned ${response.status}: ${(await response.text()).slice(0, 200)}`);
+
+  // Groq's free tier rate-limits per minute; wait and retry instead of failing.
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: payload,
+    });
+    if (response.status !== 429 || attempt === 3) break;
+    const retryAfter = Number.parseFloat(response.headers.get("retry-after") ?? "");
+    const waitMs = Math.min(Number.isFinite(retryAfter) ? retryAfter * 1000 + 500 : 15000, 30000);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+  if (!response || !response.ok) {
+    throw new Error(`Groq returned ${response?.status ?? "no response"}: ${(await response?.text())?.slice(0, 200) ?? ""}`);
   }
   const data = (await response.json()) as {
     choices?: Array<{ message?: { content?: string | null } }>;
@@ -70,16 +80,16 @@ async function triageOne(
     "",
     `From: ${message.fromName} <${message.fromAddress}>`,
     `Subject: ${message.subject}`,
-    `Body:\n"""${message.body}"""`,
+    `Body:\n"""${message.body.slice(0, 1500)}"""`,
     "",
     styleExamples.length
-      ? `Examples of how the founder writes (match this tone and length):\n${styleExamples.map((e, i) => `Example ${i + 1}: """${e}"""`).join("\n")}\n`
+      ? `Examples of how the founder writes (match this tone and length):\n${styleExamples.slice(0, 3).map((e, i) => `Example ${i + 1}: """${e.slice(0, 300)}"""`).join("\n")}\n`
       : "",
     'If and only if the category is "reply_today", also write a short reply draft in the founder\'s voice. Never invent facts, prices, dates, or commitments; use [bracketed placeholders] where the founder must fill something in. Otherwise leave the draft empty.',
     'Return only JSON with: "category", "reasoning" (one short sentence), "draft" (string, empty unless reply_today).',
   ].join("\n");
 
-  const result = await groqJson(system, user, 700);
+  const result = await groqJson(system, user, 400);
   const category = CATEGORIES.includes(result.category as Category)
     ? (result.category as Category)
     : "can_wait";
@@ -90,7 +100,9 @@ async function triageOne(
   };
 }
 
-export type SyncResult = { fetched: number; processed: number; drafts: number; failed: number };
+export type SyncResult = { fetched: number; processed: number; drafts: number; failed: number; remaining: number };
+
+const BATCH_SIZE = 6;
 
 export async function syncInbox(): Promise<SyncResult> {
   const [account] = await db.select().from(inboxAccountTable).limit(1);
@@ -108,8 +120,10 @@ export async function syncInbox(): Promise<SyncResult> {
         .where(inArray(inboxMessagesTable.gmailId, candidates.map((m) => m.id)))
     : [];
   const seen = new Set(existing.map((row) => row.gmailId));
-  const fresh = candidates.filter((m) => !seen.has(m.id));
-  if (!fresh.length) return { fetched: recent.length, processed: 0, drafts: 0, failed: 0 };
+  const allFresh = candidates.filter((m) => !seen.has(m.id));
+  const fresh = allFresh.slice(0, BATCH_SIZE);
+  const remaining = allFresh.length - fresh.length;
+  if (!fresh.length) return { fetched: recent.length, processed: 0, drafts: 0, failed: 0, remaining: 0 };
 
   const vips = new Set((await db.select().from(inboxVipsTable)).map((v) => v.email.toLowerCase()));
   const styleExamples = await listSentExamples(accessToken, 4).catch(() => []);
@@ -154,7 +168,7 @@ export async function syncInbox(): Promise<SyncResult> {
       logger.warn({ gmailId: message.id, err: err instanceof Error ? err.message : err }, "Inbox triage failed for a message");
     }
   }
-  return { fetched: recent.length, processed, drafts, failed };
+  return { fetched: recent.length, processed, drafts, failed, remaining };
 }
 
 export async function generateBrief(): Promise<string> {

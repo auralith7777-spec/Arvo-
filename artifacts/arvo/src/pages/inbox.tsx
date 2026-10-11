@@ -67,8 +67,8 @@ export default function InboxPage() {
   const sync = async () => {
     setBusy('sync'); setError(null); setNotice(null);
     try {
-      const r = await api<{ fetched: number; processed: number; drafts: number; failed: number }>('/sync', { method: 'POST' });
-      setNotice(`Checked ${r.fetched} recent emails: ${r.processed} new, ${r.drafts} drafts saved to Gmail${r.failed ? `, ${r.failed} failed` : ''}.`);
+      const r = await api<{ fetched: number; processed: number; drafts: number; failed: number; remaining: number }>('/sync', { method: 'POST' });
+      setNotice(`Checked ${r.fetched} recent emails: ${r.processed} new, ${r.drafts} drafts saved to Gmail${r.failed ? `, ${r.failed} failed` : ''}.${r.remaining ? ` ${r.remaining} more waiting: click Sync again.` : ''}`);
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : 'Sync failed.'); }
     finally { setBusy(null); }
