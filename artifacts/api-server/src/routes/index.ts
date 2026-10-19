@@ -5,6 +5,7 @@ import healthRouter from "./health";
 import inboxRouter from "./inbox";
 import invoicesRouter from "./invoices";
 import voiceRouter from "./voice";
+import wealthRouter from "./wealth";
 import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -19,5 +20,6 @@ router.use(requireAuth);
 router.use(dashboardRouter);
 router.use(invoicesRouter);
 router.use(inboxRouter);
+router.use(wealthRouter);
 
 export default router;

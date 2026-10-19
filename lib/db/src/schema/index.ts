@@ -19,3 +19,4 @@
 
 export * from "./arvo";
 export * from "./inbox";
+export * from "./wealth";

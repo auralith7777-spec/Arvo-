@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Activity, ArrowUpRight, CircleHelp, Command, Inbox, LogOut, Settings2 } from 'lucide-react';
+import { Activity, ArrowUpRight, CircleHelp, Command, Inbox, LogOut, Settings2, TrendingDown } from 'lucide-react';
 import { useHealthCheck } from '@workspace/api-client-react';
 
 async function handleLogout() {
@@ -31,6 +31,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <Link href="/inbox" className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold no-underline transition-colors ${location === '/inbox' ? 'bg-[#344354] text-[#fffaf0]' : 'text-[#b5bec7] hover:bg-[#2a3949] hover:text-white'}`} data-testid="link-inbox">
               <Inbox size={17} /> Inbox
             </Link>
+            <Link href="/wealth" className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold no-underline transition-colors ${location === '/wealth' ? 'bg-[#344354] text-[#fffaf0]' : 'text-[#b5bec7] hover:bg-[#2a3949] hover:text-white'}`} data-testid="link-wealth">
+              <TrendingDown size={17} /> Wealth
+            </Link>
             <Link href="/settings" className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold no-underline transition-colors ${location === '/settings' ? 'bg-[#344354] text-[#fffaf0]' : 'text-[#b5bec7] hover:bg-[#2a3949] hover:text-white'}`} data-testid="link-settings">
               <Settings2 size={17} /> Settings
             </Link>
@@ -59,6 +62,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <nav className="flex gap-4 text-xs font-semibold">
             <Link href="/" className="text-[#344e68] no-underline">Recovery</Link>
             <Link href="/inbox" className="text-[#687584] no-underline">Inbox</Link>
+            <Link href="/wealth" className="text-[#687584] no-underline">Wealth</Link>
             <Link href="/settings" className="text-[#687584] no-underline">Settings</Link>
           </nav>
         </header>

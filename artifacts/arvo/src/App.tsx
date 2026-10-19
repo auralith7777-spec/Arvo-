@@ -7,6 +7,7 @@ import AppShell from '@/components/app-shell';
 import DashboardPage from '@/pages/dashboard';
 import SettingsPage from '@/pages/settings';
 import InboxPage from '@/pages/inbox';
+import WealthPage from '@/pages/wealth';
 import NotFound from '@/pages/not-found';
 import LoginPage from '@/pages/login';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
@@ -49,6 +50,7 @@ function Router() {
         <Switch>
           <Route path="/" component={DashboardPage} />
           <Route path="/inbox" component={InboxPage} />
+          <Route path="/wealth" component={WealthPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />
         </Switch>
